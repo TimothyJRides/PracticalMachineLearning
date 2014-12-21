@@ -1,0 +1,133 @@
+---
+title: "PML - Project"
+author: "Timothy J. Carroll"
+date: "December 21, 2014"
+output: html_document
+---
+
+## Summary
+
+The object of this project is to develope a fit model which can predict whether or not a subject did an arm curl with correct form, bsed upon readings from sensors on a subject's arm, hand, waist and dumbell. 
+
+## Data
+
+The training data was gathered from 6 subjects who were asked to perform an arm curl in 5 different ways- 1 correctly, and 4 incorrectly. After developing a prediction model, it will be used on a test set of 20 observations. It came from the Human Activity Recognition Dataset information is available [http://groupware.les.inf.puc-rio.br/har](here). You can download the [https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv](training) and [https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv](test) set as well.
+
+## Data Processing
+
+The data was downloaded, and after examination, only the movement data from the arm, hand, waist and dumbell was kept.
+
+
+```{r, cache=TRUE}
+# Load training and testing set from project file.
+
+training <- read.csv("pml-training.csv", header=TRUE)
+testing <- read.csv("pml-testing.csv", header=TRUE)
+
+# We only want belt, forearm, arm and dumbell data.
+
+training <- training[,c(8:11, 39:49, 60:68, 84:86,102, 113:124, 151:160)]
+```
+
+To check for NAs, a quick column sum was run, which showed totals for all predicting columns, and no other data cleaning was needed.
+
+
+```{r, cache=TRUE}
+# Check for NAs with quick colSums.
+
+colSums(training[,-50])
+```
+
+The training set was split into training and testing sets, with a .85/.15 split, for validation purposes.
+
+```{r, cache=TRUE}
+# Create seperate training and test sets from the training set.
+
+library(caret)
+
+set.seed(2718)
+
+inTrain <- createDataPartition(y=training$class, p=0.85, list=FALSE)
+
+trn <- training[inTrain,]
+tst <- training[-inTrain,]
+```
+
+## Buildling Prediction Model
+
+I decided to try to prediction models and use the most accurate. The Random Forest and KNN seemed to be promising. I ran them through the caret package, keeping most defaults.
+
+```{r, cache=TRUE}
+
+library(randomForest)
+
+# Random Forest
+
+set.seed(31416)
+trnFitrf <- train(classe~.,method="rf",data=trn)
+
+predRF <- predict(trnFitrf, newdata=tst)
+
+confusionMatrix(predRF,tst$classe)
+
+# knn
+
+set.seed(31416)
+trnFitkn <- train(classe~.,method="knn",data=trn)
+
+predKN <- predict(trnFitkn, newdata=tst)
+
+confusionMatrix(predKN,tst$classe)
+```
+
+Looking at the confusion matrix for both methods, it is obvious the random forest has higher accuracy, and that is the model that should be used to build the prediction algorithm.
+
+The prediction tables for KNN and Random Forest are below, in that order. They clearly show the Random Forest algorithm to be better.
+
+```{r, cache=TRUE}
+# KNN
+table(predKN, tst$classe)
+```
+
+```{r, cache=TRUE}
+# Random Forest
+table(predRF, tst$classe)
+```
+
+Since we are using the Random Forest predictior which improves accuracy by generating a large number of bootstrapped trees, we do not need to worry about cross validation. It is handled by the model.
+
+## Testing
+
+First we need to process the data just as we did for the training set.
+
+```{r, cache=TRUE}
+# Process the test data.
+
+testing <- testing[,c(8:11, 39:49, 60:68, 84:86,102, 113:124, 151:160)]
+```
+
+The we run the test data and save the files, as prescribed by the assignment directions.
+
+```{r, cache=TRUE}
+# Run the test data with the Random Forest model.
+
+answers <- predict(trnFitrf, newdata=testing)
+
+# Save into answer files.
+
+setwd("Answers")
+
+pml_write_files <- function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(answers)
+```
+
+## Conclusion
+
+When submitting the predictions, all 20 predictions were deemed correct. The Random Forest Model seemed to work well for this dataset and the goal of predicting whether an arm curl was performed correctly or not.
